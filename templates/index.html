@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seattle Weather Predictor</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h1 { color: #333; text-align: center; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input[type="number"], input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        input[type="submit"] { background-color: #5cb85c; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px; width: 100%; }
+        input[type="submit"]:hover { background-color: #4cae4c; }
+        .prediction-result { margin-top: 20px; padding: 15px; background-color: #dff0d8; border: 1px solid #d6e9c6; color: #3c763d; border-radius: 4px; text-align: center; font-size: 1.1em;}
+        .error-message { margin-top: 20px; padding: 15px; background-color: #f2dede; border: 1px solid #ebccd1; color: #a94442; border-radius: 4px; text-align: center; font-size: 1.1em;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Seattle Weather Predictor</h1>
+        <form action="/" method="post">
+            {% if expected_features %}
+                {% for feature in expected_features %}
+                    <label for="{{ feature }}">{{ feature.replace('_', ' ').title() }}:</label>
+                    <input type="number" step="any" id="{{ feature }}" name="{{ feature }}" value="{{ input_data.get(feature, '') }}" required>
+                {% endfor %}
+            {% else %}
+                <p class="error-message">Feature list not available. Cannot create form.</p>
+            {% endif %}
+
+            {% if expected_features %}
+            <input type="submit" value="Predict Weather">
+            {% endif %}
+        </form>
+
+        {% if prediction_text %}
+            <div class="prediction-result">
+                {{ prediction_text }}
+            </div>
+        {% endif %}
+
+        {% if error_text %}
+            <div class="error-message">
+                {{ error_text }}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
