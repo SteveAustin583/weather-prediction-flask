@@ -1,4 +1,11 @@
-# --- app.py (Refactored) ---
+"""
+Flask Web Application for Weather Prediction.
+
+This application provides a user interface and an API endpoint to predict
+weather conditions based on a pre-trained machine learning model.
+It loads model artifacts at startup and serves predictions via a web form
+or a JSON API.
+"""
 
 import sys
 from pathlib import Path
@@ -10,31 +17,28 @@ import pandas as pd
 app = Flask(__name__)
 
 # --- Configuration & Global Variables ---
-# Feedback: Use pathlib for more concise path handling.
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_ARTIFACTS_DIR = BASE_DIR / "model_artifacts"
 
-# Feedback: Group related filenames into a single data structure.
 ARTIFACT_PATHS = {
     "model": MODEL_ARTIFACTS_DIR / "weather_prediction_model.joblib",
     "encoder": MODEL_ARTIFACTS_DIR / "weather_label_encoder.joblib",
     "features": MODEL_ARTIFACTS_DIR / "classifier_feature_names.joblib",
 }
 
-# Global variables for loaded artifacts, initialized to None.
-# These will be loaded by _load_artifacts() at startup.
+# Global variables for loaded artifacts, will be populated at startup.
 model = None
 label_encoder = None
 expected_features = None
 
-
 # --- Helper Functions ---
-# Feedback: Create a helper function for loading artifacts.
-def _load_artifacts():
+
+def load_artifacts():
     """
     Loads machine learning artifacts from disk.
-    This function is called once at application startup.
-    If any artifact is not found, it will print an error and exit.
+
+    This function is called once at application startup. If any artifact
+    is not found, it prints an error and exits the application.
     """
     global model, label_encoder, expected_features
     print("Loading model artifacts...")
@@ -45,17 +49,15 @@ def _load_artifacts():
         print("Artifacts loaded successfully.")
         print(f"Expected features: {expected_features}")
     except FileNotFoundError as e:
-        # Feedback: Fail startup if model doesn't load.
-        # This is more robust than letting the app run in a broken state.
         print(f"Error: Artifact not found at {e.filename}.")
         print("Application cannot start without all model artifacts.")
-        sys.exit(1) # Exit the application with a non-zero status code
+        sys.exit(1)
 
-def _validate_and_prepare_features(data_source, source_type='form'):
+def validate_and_prepare_features(data_source):
     """Validates and extracts feature values from a dictionary-like source."""
     feature_values = []
     errors = []
-    
+
     for feature in expected_features:
         value = data_source.get(feature)
         if value is None or value == '':
@@ -65,31 +67,31 @@ def _validate_and_prepare_features(data_source, source_type='form'):
             feature_values.append(float(value))
         except (ValueError, TypeError):
             errors.append(f"Feature '{feature}' must be a number.")
-    
+
     return feature_values, errors
 
-# Feedback: Break out POST logic into a helper for a cleaner index route.
-def _handle_form_prediction(form_data):
+def handle_form_prediction(form_data):
     """Handles the prediction logic for the web form."""
-    feature_values, errors = _validate_and_prepare_features(form_data)
-    
+    feature_values, errors = validate_and_prepare_features(form_data)
+
     if errors:
         return None, " ".join(errors)
 
     # Create DataFrame for prediction
     input_df = pd.DataFrame([feature_values], columns=expected_features)
-    
+
     # Make prediction
     encoded_prediction = model.predict(input_df)
     predicted_weather = label_encoder.inverse_transform(encoded_prediction)[0]
-    
+
     prediction_text = f"Predicted Weather: {predicted_weather}"
     return prediction_text, None
 
-
 # --- Flask Routes ---
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    """Renders the main page and handles form submissions for predictions."""
     prediction_text = None
     error_text = None
     # Keep user's input in the form after submission
@@ -98,12 +100,11 @@ def index():
     if request.method == 'POST':
         input_data = request.form.to_dict()
         try:
-            prediction_text, error_text = _handle_form_prediction(request.form)
-        except Exception as e:
-            # Feedback: Remove generic "unexpected error" messages.
-            # A traceback in the log is more useful for developers.
+            prediction_text, error_text = handle_form_prediction(request.form)
+        except (ValueError, KeyError) as e:
+            # Catch specific errors from model prediction or data handling
             print(f"Unhandled prediction error: {e}")
-            error_text = "An internal error occurred. Please check server logs."
+            error_text = "An internal error occurred during prediction. Please check server logs."
 
     return render_template(
         'index.html',
@@ -115,9 +116,10 @@ def index():
 
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
+    """Provides an API endpoint for weather prediction."""
     try:
         data = request.get_json(force=True)
-        feature_values, errors = _validate_and_prepare_features(data, source_type='json')
+        feature_values, errors = validate_and_prepare_features(data)
 
         if errors:
             return jsonify({'error': " ".join(errors)}), 400
@@ -131,17 +133,165 @@ def api_predict():
 
         return jsonify({'predicted_weather': predicted_weather})
 
-    except Exception as e:
-        # Feedback: f-string already calls str().
+    except (ValueError, KeyError) as e:
+        # Catch specific errors from model prediction or data handling
         print(f"API Prediction error: {e}")
         return jsonify({'error': f'Error processing request: {e}'}), 500
 
+# --- Main Execution ---
 
-# --- Run the App ---
 if __name__ == '__main__':
-    # Feedback: Defer execution of I/O operations until runtime.
-    _load_artifacts()
+    load_artifacts()
     app.run(debug=True, port=5000)
+
+
+
+# IGNORE THE CODE BELOW
+
+# # --- app.py (Refactored) ---
+
+# import sys
+# from pathlib import Path
+# from flask import Flask, request, jsonify, render_template
+# import joblib
+# import pandas as pd
+
+# # Initialize Flask app
+# app = Flask(__name__)
+
+# # --- Configuration & Global Variables ---
+# # Feedback: Use pathlib for more concise path handling.
+# BASE_DIR = Path(__file__).resolve().parent
+# MODEL_ARTIFACTS_DIR = BASE_DIR / "model_artifacts"
+
+# # Feedback: Group related filenames into a single data structure.
+# ARTIFACT_PATHS = {
+#     "model": MODEL_ARTIFACTS_DIR / "weather_prediction_model.joblib",
+#     "encoder": MODEL_ARTIFACTS_DIR / "weather_label_encoder.joblib",
+#     "features": MODEL_ARTIFACTS_DIR / "classifier_feature_names.joblib",
+# }
+
+# # Global variables for loaded artifacts, initialized to None.
+# # These will be loaded by _load_artifacts() at startup.
+# model = None
+# label_encoder = None
+# expected_features = None
+
+
+# # --- Helper Functions ---
+# # Feedback: Create a helper function for loading artifacts.
+# def _load_artifacts():
+#     """
+#     Loads machine learning artifacts from disk.
+#     This function is called once at application startup.
+#     If any artifact is not found, it will print an error and exit.
+#     """
+#     global model, label_encoder, expected_features
+#     print("Loading model artifacts...")
+#     try:
+#         model = joblib.load(ARTIFACT_PATHS["model"])
+#         label_encoder = joblib.load(ARTIFACT_PATHS["encoder"])
+#         expected_features = joblib.load(ARTIFACT_PATHS["features"])
+#         print("Artifacts loaded successfully.")
+#         print(f"Expected features: {expected_features}")
+#     except FileNotFoundError as e:
+#         # Feedback: Fail startup if model doesn't load.
+#         # This is more robust than letting the app run in a broken state.
+#         print(f"Error: Artifact not found at {e.filename}.")
+#         print("Application cannot start without all model artifacts.")
+#         sys.exit(1) # Exit the application with a non-zero status code
+
+# def _validate_and_prepare_features(data_source, source_type='form'):
+#     """Validates and extracts feature values from a dictionary-like source."""
+#     feature_values = []
+#     errors = []
+    
+#     for feature in expected_features:
+#         value = data_source.get(feature)
+#         if value is None or value == '':
+#             errors.append(f"Missing input for: '{feature}'.")
+#             continue
+#         try:
+#             feature_values.append(float(value))
+#         except (ValueError, TypeError):
+#             errors.append(f"Feature '{feature}' must be a number.")
+    
+#     return feature_values, errors
+
+# # Feedback: Break out POST logic into a helper for a cleaner index route.
+# def _handle_form_prediction(form_data):
+#     """Handles the prediction logic for the web form."""
+#     feature_values, errors = _validate_and_prepare_features(form_data)
+    
+#     if errors:
+#         return None, " ".join(errors)
+
+#     # Create DataFrame for prediction
+#     input_df = pd.DataFrame([feature_values], columns=expected_features)
+    
+#     # Make prediction
+#     encoded_prediction = model.predict(input_df)
+#     predicted_weather = label_encoder.inverse_transform(encoded_prediction)[0]
+    
+#     prediction_text = f"Predicted Weather: {predicted_weather}"
+#     return prediction_text, None
+
+
+# # --- Flask Routes ---
+# @app.route('/', methods=['GET', 'POST'])
+# def index():
+#     prediction_text = None
+#     error_text = None
+#     # Keep user's input in the form after submission
+#     input_data = {feature: "" for feature in expected_features}
+
+#     if request.method == 'POST':
+#         input_data = request.form.to_dict()
+#         try:
+#             prediction_text, error_text = _handle_form_prediction(request.form)
+#         except Exception as e:
+#             # Feedback: Remove generic "unexpected error" messages.
+#             # A traceback in the log is more useful for developers.
+#             print(f"Unhandled prediction error: {e}")
+#             error_text = "An internal error occurred. Please check server logs."
+
+#     return render_template(
+#         'index.html',
+#         prediction_text=prediction_text,
+#         error_text=error_text,
+#         input_data=input_data,
+#         expected_features=expected_features
+#     )
+
+# @app.route('/api/predict', methods=['POST'])
+# def api_predict():
+#     try:
+#         data = request.get_json(force=True)
+#         feature_values, errors = _validate_and_prepare_features(data, source_type='json')
+
+#         if errors:
+#             return jsonify({'error': " ".join(errors)}), 400
+
+#         # Create DataFrame for prediction
+#         input_df = pd.DataFrame([feature_values], columns=expected_features)
+
+#         # Make prediction
+#         encoded_prediction = model.predict(input_df)
+#         predicted_weather = label_encoder.inverse_transform(encoded_prediction)[0]
+
+#         return jsonify({'predicted_weather': predicted_weather})
+
+#     except Exception as e:
+#         # Feedback: f-string already calls str().
+#         print(f"API Prediction error: {e}")
+#         return jsonify({'error': f'Error processing request: {e}'}), 500
+
+
+# # --- Run the App ---
+# if __name__ == '__main__':
+#     # Feedback: Defer execution of I/O operations until runtime.
+#     _load_artifacts()
+#     app.run(debug=True, port=5000)
 
 
 
